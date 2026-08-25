@@ -1,76 +1,76 @@
 # Process overview
 
-<!-- TEMPLATE: this file is a shape to fill in, not a form. Replace everything
-     in it with your own overview, and delete this comment — `pnpm
-     check:evidence` will remind you if it's still here. -->
-
-A reading-guide to how the work came together --- a map to your process, not an
-essay about it. Markers read this file and follow its citations; they don't
-trawl the repo for evidence you didn't point at, so if a moment mattered, cite
-it.
-
-This file is the shape; the course site's
-[assessment page](https://comp.anu.edu.au/courses/comp4020-agentic-coding-studio/topics/assessment/#what-you-submit)
-is the requirement, and its
-[word counts](https://comp.anu.edu.au/courses/comp4020-agentic-coding-studio/topics/assessment/#word-counts)
-cover every deliverable.
-
 ## What I built
 
-One paragraph: the thing, and the idea behind it.
+A camera-and-touch strum harp: eight boundary lines laid out left-to-right
+across the screen, tuned to a scale, that ring when a tracked point — a hand
+in front of the camera, or a finger/mouse on touch/pointer — crosses them.
+The idea started from seeing a classmate's (comp4020-ass1-Januaraine) camera
+hand-tracking work for an unrelated assignment and wanting the same input for
+sound instead of motion.
 
 ## The moments that mattered
 
-Three or four for an assignment; fewer is fine for a weekly prototype. Keep the
-list short so each moment has room to do all four jobs:
+1. **What happened**: the first working version
+   ([`2b83ffd`](https://github.com/comp4020-agentic-coding-studio/comp4020-crit4-edwarbudiman/commit/2b83ffd69edc8508ebe25564e4218acd18a92a6a))
+   used plain frame-to-frame motion diffing (`columnMotionCentroid`) as the
+   only camera input — no hand model, just "which columns changed the most
+   between two frames." It played, but tracking felt wrong the moment a head
+   or torso was in frame: anything that moved competed with the hand for the
+   centroid.
+   **What I did instead of the obvious thing**: rather than re-prompting for
+   a better threshold or smoothing constant, I asked for the actual failure
+   mode to be measured on synthetic frames rather than guessed at, which
+   produced two concrete, named bugs — recorded as decisions, not just fixed
+   in place: ADR 0002 measured that diffing against the *previous* frame
+   makes direction unrecoverable on a fast stroke (a 0.30→0.75 sweep reported
+   as 0.298), and that diffing against an *adapting background* fixes that
+   but then tracks a whole torso instead of a hand (0.514 regardless of where
+   the hand was). ADR 0003 is the conclusion those two failures point to: no
+   arrangement of motion-diff signals knows what a hand is, so camera input
+   was rebuilt on MediaPipe's `HandLandmarker` — a real detected hand
+   landmark — with the old motion-diff tracker kept only as a fallback for
+   when that model can't load.
+   **How I knew it was right**: the ADRs' own measurements (span shrinking
+   from 0.90 to 0.54 with a moving head in frame, before the fix), then
+   playing it live with a head deliberately bobbing in frame — the harp
+   stayed locked on the hand instead of drifting toward the head, and
+   `pnpm check` (typecheck, build, all 30 vitest cases) stayed green through
+   the rewrite of `cameraTracker.ts` and `strings.ts`'s crossing detection.
+   **Citation**:
+   [`2b83ffd...f95a809`](https://github.com/comp4020-agentic-coding-studio/comp4020-crit4-edwarbudiman/compare/2b83ffd69edc8508ebe25564e4218acd18a92a6a...f95a809)
+   (see `docs/adr/0002-background-model-not-frame-diff.md` and
+   `docs/adr/0003-hand-landmarks-for-camera-input.md` for the measurements).
 
-1. **what happened** --- the problem, or the thing that went wrong
-2. **what you did instead of the obvious thing** --- the call you made, and why
-   it beat the obvious one
-3. **how you knew it was right** --- the check you ran, the viewport you looked
-   at, what you read before accepting the diff
-4. **the citation** --- a commit or commit range, a `CLAUDE.md` change, a check
-   that went from red to green, a prompt paired with the commit it produced
+2. **What happened**: the same commit's full-width sweep test — eight
+   strings plucked in fast succession — clipped audibly at the original
+   `MASTER_GAIN` of 0.8.
+   **What I did instead of the obvious thing**: instead of ear-balancing a
+   lower gain by feel, I asked for the actual worst case (8 voices 37ms
+   apart at full velocity) to be measured against the ±1.0 ceiling, which is
+   what settled on 0.6 (peaks at 0.99) rather than an arbitrary "turn it
+   down a bit."
+   **How I knew it was right**: played a deliberate full-width sweep after
+   the change and it no longer clipped, at either input source.
+   **Citation**:
+   [`f95a809`](https://github.com/comp4020-agentic-coding-studio/comp4020-crit4-edwarbudiman/commit/f95a809)
 
-Jobs 2 and 3 are the ones the repo can't tell a reader on its own, so they're
-where the marks are. The strongest moments are the ones where a correction
-landed in the **harness** --- the standards and checks your work has to satisfy
---- rather than in a retry: a rule added to `CLAUDE.md`, a check wired up, an
-attempt thrown away. Retrying until it passes is the routine case, and changing
-what the work runs against is the skilled one.
-
-Cite each moment as a link whose text is the commit hash or range and whose
-target is this repo's commit or compare URL, so a reader clicks straight to the
-evidence:
-
-- one commit: [`a1b2c3d`](https://github.com/YOUR-ORG/YOUR-REPO/commit/a1b2c3d)
-- a range:
-  [`a1b2c3d...e4f5a6b`](https://github.com/YOUR-ORG/YOUR-REPO/compare/a1b2c3d...e4f5a6b)
-
-To pair a prompt with the commit it produced, quote the prompt (curated, not a
-full transcript) next to the citation:
-
-> the prompt, verbatim
-
-Screenshots are welcome where one carries the verification better than a
-sentence does. Commit the file to this repo and link it with a **relative**
-path, which is what makes it render on GitHub: `![alt text](docs/before.png)`.
-Images don't count towards the word count and don't replace the citation.
-
-### A worked moment, for shape
-
-Delete this section along with the rest of the boilerplate --- it's here to show
-the four jobs in one paragraph, not to be imitated in content.
-
-> The date formatter kept coming back with `toLocaleDateString()` and no locale
-> argument, so the same build rendered differently on my machine and in CI. I'd
-> already re-prompted it twice, which fixed the line but not the habit, so the
-> third time I put the rule in `CLAUDE.md` instead
-> ([`3f9ac21`](https://github.com/YOUR-ORG/YOUR-REPO/commit/3f9ac21)) and added
-> a spec test that fails on a bare `toLocaleDateString`. That's what told me it
-> had actually taken: the test went red against the old code and green against
-> the new, and the next two features it wrote passed it without prompting
-> ([`3f9ac21...b7e0d14`](https://github.com/YOUR-ORG/YOUR-REPO/compare/3f9ac21...b7e0d14)).
+3. **What happened**: `strings.ts` originally plucked by discrete "zone,"
+   so a hand parked near a boundary could re-trigger on camera jitter with
+   no way to damp it.
+   **What I did instead of the obvious thing**: rather than adding a
+   one-off debounce timer around the existing zone model, the crossing
+   model itself was replaced with boundary-line crossings that carry a
+   deadband (a line must be moved clear of before it re-arms) and a minimum
+   gap in milliseconds — a structural fix in the harness the instrument
+   plays against, not a patch around a symptom.
+   **How I knew it was right**: the rewritten `strings.test.ts` cases
+   (pruned to the arithmetic that can be silently wrong — string count,
+   ascending scale — rather than asserting exact frequencies) plus playing
+   a hand held still directly on a line and confirming it doesn't
+   machine-gun.
+   **Citation**:
+   [`f95a809`](https://github.com/comp4020-agentic-coding-studio/comp4020-crit4-edwarbudiman/commit/f95a809)
 
 ## Before you ship
 
