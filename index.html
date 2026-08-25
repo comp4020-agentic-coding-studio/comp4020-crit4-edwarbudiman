@@ -24,8 +24,8 @@
     <main>
       <h1>Strum</h1>
       <p data-testid="intro">
-        A row of strings, tuned so nothing you play can sound wrong. Wave a hand across them on
-        camera, or drag a pointer or finger — same strings, same tune, either way.
+        Eight strings, <em>do</em> up to <em>do</em>. Wave a hand across them on camera, or drag a
+        pointer or finger — same strings, same tune, either way. There is nothing to get right.
       </p>
 
       <div id="instrument">
@@ -39,28 +39,37 @@
               Use touch / mouse
             </button>
           </div>
-          <p class="gate-hint">...or just press 1–7 on your keyboard.</p>
+          <p class="gate-hint">...or just press 1–8 on your keyboard.</p>
         </div>
 
         <canvas data-testid="play-area" id="stage" aria-label="Strings — drag or wave across them to play"></canvas>
 
         <div id="controls" hidden>
           <button id="switch-input" type="button">Switch input</button>
-          <button id="flip-camera" type="button" hidden>Flip camera</button>
         </div>
 
-        <p id="camera-error" role="status" hidden>
-          Camera unavailable — switched you to touch / mouse instead.
-        </p>
+        <p id="camera-status" role="status" hidden></p>
 
-        <video
-          data-testid="camera-preview"
-          id="camera-preview"
-          autoplay
-          playsinline
-          muted
-          hidden
-        ></video>
+        <div id="camera-panel" hidden>
+          <div id="camera-frame">
+            <!-- The visible preview when hand tracking is running: the camera
+                 frame, the hand's landmarks and the boundary lines, composited
+                 and mirrored in one draw so they cannot drift apart. -->
+            <canvas id="camera-view" aria-hidden="true" hidden></canvas>
+            <video
+              data-testid="camera-preview"
+              id="camera-preview"
+              autoplay
+              playsinline
+              muted
+              hidden
+            ></video>
+            <!-- Debug only (DEBUG_OVERLAY in main.ts): boundary lines and the
+                 tracked Position, drawn un-mirrored over the mirrored video. -->
+            <canvas id="debug-overlay" aria-hidden="true" hidden></canvas>
+          </div>
+          <pre id="debug-readout" aria-hidden="true" hidden></pre>
+        </div>
       </div>
     </main>
     <script type="module" src="./main.ts"></script>

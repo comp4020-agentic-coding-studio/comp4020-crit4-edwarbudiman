@@ -1,21 +1,29 @@
-// Pure logic for the instrument's Strings (CONTEXT.md): a fixed pentatonic
-// Scale laid out left-to-right, and the Crossing detection that decides
-// which Strings a moving Position plucks.
+// Pure logic for the instrument's Strings (CONTEXT.md): a diatonic major
+// Scale laid out left-to-right, and the boundary-line Crossing detection that
+// decides which Strings a moving Position plucks.
+//
+// Crossing is judged against a *line* per String, sitting at that String's
+// drawn position — so what you see and what you hear are the same coordinate.
+// Crossing a line in either direction plucks it, which is what makes waving
+// back and forth over one String repeat that String.
 
-// Major pentatonic, semitones above the root: root, 2nd, 3rd, 5th, 6th.
-const PENTATONIC_STEPS = [0, 2, 4, 7, 9];
+// Major scale, semitones above the root: do re mi fa sol la si.
+const MAJOR_STEPS = [0, 2, 4, 5, 7, 9, 11];
+const SOLFEGE = ["do", "re", "mi", "fa", "sol", "la", "si"];
 
 export interface StringDef {
   index: number;
   freq: number;
+  /** "do", "re", … "si", then "do'" an octave up — for the debug readout. */
+  label: string;
 }
 
-/** Frequencies for `count` Strings, cycling the pentatonic pattern up an octave at a time. */
+/** Frequencies for `count` Strings, cycling the major pattern up an octave at a time. */
 export function buildScale(count: number, rootFreq: number): number[] {
   const freqs: number[] = [];
   for (let i = 0; i < count; i++) {
-    const octave = Math.floor(i / PENTATONIC_STEPS.length);
-    const step = PENTATONIC_STEPS[i % PENTATONIC_STEPS.length];
+    const octave = Math.floor(i / MAJOR_STEPS.length);
+    const step = MAJOR_STEPS[i % MAJOR_STEPS.length];
     const semitones = step + octave * 12;
     freqs.push(rootFreq * Math.pow(2, semitones / 12));
   }
@@ -23,28 +31,93 @@ export function buildScale(count: number, rootFreq: number): number[] {
 }
 
 export function buildStrings(count: number, rootFreq: number): StringDef[] {
-  return buildScale(count, rootFreq).map((freq, index) => ({ index, freq }));
+  return buildScale(count, rootFreq).map((freq, index) => ({
+    index,
+    freq,
+    label: SOLFEGE[index % SOLFEGE.length] + "'".repeat(Math.floor(index / SOLFEGE.length)),
+  }));
 }
 
-/** Which String's zone a normalized x (0..1) falls in. */
-export function zoneAt(x: number, count: number): number {
-  const clamped = Math.min(0.999999, Math.max(0, x));
-  return Math.min(count - 1, Math.floor(clamped * count));
+/** Normalized x (0..1) of String `index`'s boundary line — also where it's drawn. */
+export function lineX(index: number, count: number): number {
+  return (index + 0.5) / count;
+}
+
+/** Normalized gap between adjacent boundary lines. */
+export function lineSpacing(count: number): number {
+  return 1 / count;
+}
+
+export interface CrossingOptions {
+  count: number;
+  /** How far past a line the Position must travel before that line re-arms, as a fraction of line spacing. */
+  deadbandFraction: number;
+  /** A line cannot pluck twice within this many milliseconds. */
+  minGapMs: number;
+}
+
+export interface CrossingState {
+  prevX: number | null;
+  armed: boolean[];
+  lastPluckAt: number[];
+}
+
+export function createCrossingState(count: number): CrossingState {
+  return {
+    prevX: null,
+    armed: new Array(count).fill(true),
+    lastPluckAt: new Array(count).fill(-Infinity),
+  };
 }
 
 /**
- * Every zone boundary crossed moving from `prevZone` to `currZone`, in
- * order, excluding `prevZone` itself. Empty when the zone hasn't changed
- * (jitter inside one String plucks nothing). A multi-zone jump rings every
- * zone in between, so a fast sweep skips no notes.
+ * Which Strings the Position plucked moving to `x`, in travel order.
+ *
+ * A line fires when the segment between the previous and current Position
+ * passes it, in either direction. Two guards stop a hand parked on a line
+ * from machine-gunning it on camera noise: the line disarms after firing and
+ * only re-arms once the Position has moved a deadband clear of it, and it
+ * cannot fire twice inside `minGapMs`.
+ *
+ * Mutates `state` — the state is the whole point, since Crossing is a fact
+ * about movement between samples, not about a single Position.
  */
-export function crossingsBetween(prevZone: number, currZone: number): number[] {
-  if (prevZone === currZone) return [];
-  const step = currZone > prevZone ? 1 : -1;
-  const crossings: number[] = [];
-  for (let z = prevZone + step; ; z += step) {
-    crossings.push(z);
-    if (z === currZone) break;
+export function detectCrossings(
+  state: CrossingState,
+  x: number,
+  now: number,
+  opts: CrossingOptions,
+): number[] {
+  const { count, deadbandFraction, minGapMs } = opts;
+  const deadband = deadbandFraction * lineSpacing(count);
+
+  // Re-arm every line the Position has moved clear of, before judging crossings.
+  for (let i = 0; i < count; i++) {
+    if (!state.armed[i] && Math.abs(x - lineX(i, count)) > deadband) state.armed[i] = true;
   }
-  return crossings;
+
+  const prev = state.prevX;
+  state.prevX = x;
+  if (prev === null) return []; // first sample establishes a position, plucks nothing
+
+  const lo = Math.min(prev, x);
+  const hi = Math.max(prev, x);
+
+  // Half-open: a line exactly at the previous Position isn't crossed again.
+  const passed: number[] = [];
+  for (let i = 0; i < count; i++) {
+    const lx = lineX(i, count);
+    if (lx > lo && lx <= hi) passed.push(i);
+  }
+  if (x < prev) passed.reverse(); // travel order, so a fast sweep rings left-to-right or right-to-left
+
+  const fired: number[] = [];
+  for (const i of passed) {
+    if (!state.armed[i]) continue;
+    if (now - state.lastPluckAt[i] < minGapMs) continue;
+    state.armed[i] = false;
+    state.lastPluckAt[i] = now;
+    fired.push(i);
+  }
+  return fired;
 }

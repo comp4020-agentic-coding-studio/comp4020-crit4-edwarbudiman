@@ -107,7 +107,7 @@ h1 {
   background: #ffffffcc;
 }
 
-#camera-error {
+#camera-status {
   position: absolute;
   bottom: 0.75rem;
   left: 0.75rem;
@@ -120,15 +120,85 @@ h1 {
   font-size: 0.85rem;
 }
 
-#camera-preview {
+#camera-panel {
   position: absolute;
   bottom: 0.75rem;
   right: 0.75rem;
   z-index: 1;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.4rem;
+}
+
+/* The [hidden] guard is load-bearing: `hidden` is only `display: none` from the
+   UA stylesheet, so a bare `display: flex` here overrides it and the panel
+   shows before any camera exists. Same discipline as #entry-gate and #controls. */
+#camera-panel:not([hidden]) {
+  display: flex;
+}
+
+#camera-frame {
+  position: relative;
+  line-height: 0;
+}
+
+#camera-preview:not([hidden]) {
+  display: block;
+}
+
+#camera-preview {
   width: 7rem;
   height: 5.25rem;
   object-fit: cover;
   border-radius: 0.75rem;
   border: 3px solid #1a1a1a;
   background: #000;
+  /* Mirror, so the preview reads like a mirror rather than like a photo of
+     you. MUST stay in step with MIRROR_X in cameraTracker.ts. */
+  transform: scaleX(-1);
+}
+
+/* The hand-tracking preview. Not CSS-mirrored: handTracker.ts mirrors the
+   frame as it draws it, so overlay text reads the right way round. */
+#camera-view:not([hidden]) {
+  display: block;
+}
+
+#camera-view {
+  width: 7rem;
+  height: 5.25rem;
+  object-fit: cover;
+  border-radius: 0.75rem;
+  border: 3px solid #1a1a1a;
+  background: #000;
+}
+
+/* Debug build only (DEBUG_OVERLAY in main.ts): a 7rem preview puts the
+   boundary lines 14px apart and the deadband at ~3px — too small to judge. */
+#camera-panel.debug #camera-preview,
+#camera-panel.debug #camera-view {
+  width: 14rem;
+  height: 10.5rem;
+}
+
+/* Deliberately NOT mirrored: the tracker's x is already inverted to match the
+   mirrored video, so this canvas draws in the same space the player sees. */
+#debug-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  border-radius: 0.75rem;
+}
+
+#debug-readout {
+  margin: 0;
+  padding: 0.4rem 0.6rem;
+  border-radius: 0.5rem;
+  border: 2px solid #1a1a1a;
+  background: rgba(26, 22, 32, 0.88);
+  color: #eafff2;
+  font: 500 0.7rem / 1.45 ui-monospace, "SF Mono", Menlo, monospace;
+  white-space: pre;
 }

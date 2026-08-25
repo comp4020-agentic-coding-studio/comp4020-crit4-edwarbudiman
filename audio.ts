@@ -1,12 +1,21 @@
 // Web Audio engine: one AudioContext, one master GainNode, and a Pluck
 // (CONTEXT.md) is a short-lived oscillator voice fired per Crossing.
 
-const MASTER_GAIN = 0.8;
+// ─── TUNABLES ───────────────────────────────────────────────────────────────
+// 0.6, not 0.8: eight Plucks overlapping on a fast sweep sum past the ±1.0
+// ceiling at 0.8 and the output hard-clips. At 0.6 the worst realistic sweep
+// (8 Plucks 37ms apart at full velocity) peaks at 0.99. Turn it up here if the
+// instrument feels thin, but listen to a fast full-width sweep before you do.
+const MASTER_GAIN = 0.6;
 const PLUCK_DURATION = 0.65; // seconds
+// ────────────────────────────────────────────────────────────────────────────
 
 export interface AudioEngine {
   /** Must be called from inside a user-gesture handler (autoplay policy). */
   resume(): Promise<void>;
+  /** Whether the context is actually running — i.e. whether a Pluck would be
+   *  audible. False before the player's first gesture. */
+  running(): boolean;
   /** Fire a Pluck for one String. `velocity` (0..1) scales loudness and brightness. */
   pluck(freq: number, velocity: number): void;
 }
@@ -19,7 +28,15 @@ export function createAudioEngine(): AudioEngine {
 
   return {
     async resume() {
-      if (ctx.state === "suspended") await ctx.resume();
+      if (ctx.state === "suspended") {
+        // Rejects when there has been no user gesture yet; that is expected at
+        // page load, so it is swallowed rather than thrown.
+        await ctx.resume().catch(() => {});
+      }
+    },
+
+    running() {
+      return ctx.state === "running";
     },
 
     pluck(freq, velocity) {
