@@ -4,13 +4,131 @@ body {
   font-family: system-ui, sans-serif;
   line-height: 1.6;
   color: #1a1a1a;
+  background: #fffaf0;
 }
 
 main {
-  max-width: 40rem;
+  max-width: 48rem;
   margin: 0 auto;
 }
 
 a {
   color: #0b5fff;
+}
+
+h1 {
+  font-size: 2.5rem;
+  letter-spacing: 0.02em;
+  transform: rotate(-1deg);
+  display: inline-block;
+}
+
+#instrument {
+  position: relative;
+  margin-top: 1.5rem;
+  border-radius: 1.5rem;
+  overflow: hidden;
+  background: radial-gradient(circle at 30% 20%, #fff3e0, #ffe0f0 60%, #e0f0ff);
+  box-shadow: 0 0 0 3px #1a1a1a inset;
+}
+
+#stage {
+  display: block;
+  width: 100%;
+  height: min(70vh, 32rem);
+  touch-action: none;
+  cursor: crosshair;
+}
+
+#entry-gate {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.25rem;
+  background: rgba(255, 250, 240, 0.92);
+  text-align: center;
+  font-size: 1.15rem;
+}
+
+#entry-gate:not([hidden]) {
+  display: flex;
+}
+
+.gate-buttons {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.gate-hint {
+  font-size: 0.9rem;
+  opacity: 0.75;
+  margin: 0;
+}
+
+#entry-gate button,
+#controls button {
+  font: inherit;
+  font-weight: 600;
+  padding: 0.9rem 1.6rem;
+  border-radius: 999px;
+  border: 3px solid #1a1a1a;
+  background: #ffd166;
+  color: #1a1a1a;
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+#entry-gate button:hover,
+#controls button:hover {
+  transform: translateY(-2px) rotate(-1deg);
+  background: #ff8fa3;
+}
+
+#controls {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  z-index: 2;
+  gap: 0.5rem;
+}
+
+#controls:not([hidden]) {
+  display: flex;
+}
+
+#controls button {
+  padding: 0.4rem 0.9rem;
+  font-size: 0.85rem;
+  background: #ffffffcc;
+}
+
+#camera-error {
+  position: absolute;
+  bottom: 0.75rem;
+  left: 0.75rem;
+  z-index: 2;
+  margin: 0;
+  padding: 0.4rem 0.8rem;
+  border-radius: 999px;
+  background: #fff3cd;
+  border: 2px solid #1a1a1a;
+  font-size: 0.85rem;
+}
+
+#camera-preview {
+  position: absolute;
+  bottom: 0.75rem;
+  right: 0.75rem;
+  z-index: 1;
+  width: 7rem;
+  height: 5.25rem;
+  object-fit: cover;
+  border-radius: 0.75rem;
+  border: 3px solid #1a1a1a;
+  background: #000;
 }
