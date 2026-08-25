@@ -40,7 +40,8 @@ h1 {
   cursor: crosshair;
 }
 
-#entry-gate {
+#entry-gate,
+#tap-to-start {
   position: absolute;
   inset: 0;
   z-index: 2;
@@ -53,7 +54,8 @@ h1 {
   font-size: 1.15rem;
 }
 
-#entry-gate:not([hidden]) {
+#entry-gate:not([hidden]),
+#tap-to-start:not([hidden]) {
   display: flex;
 }
 
@@ -71,7 +73,8 @@ h1 {
 }
 
 #entry-gate button,
-#controls button {
+#controls button,
+#tap-to-start button {
   font: inherit;
   font-weight: 600;
   padding: 0.9rem 1.6rem;
@@ -84,7 +87,8 @@ h1 {
 }
 
 #entry-gate button:hover,
-#controls button:hover {
+#controls button:hover,
+#tap-to-start button:hover {
   transform: translateY(-2px) rotate(-1deg);
   background: #ff8fa3;
 }

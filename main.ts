@@ -17,7 +17,7 @@ import {
 
 /** true shows the camera testing overlay (bigger preview, boundary lines, live
  *  numbers). Flip to false to ship the clean instrument. */
-const DEBUG_OVERLAY = true;
+const DEBUG_OVERLAY = false;
 
 const STRING_COUNT = 8; // do re mi fa sol la si do'
 const ROOT_FREQ = 261.6256; // C4 — so "do" is literally middle C
@@ -32,9 +32,10 @@ const DEADBAND_FRACTION = 0.20;
  *  faster than a hand can wave, so it only ever suppresses jitter. */
 const MIN_GAP_MS = 50;
 
-/** The page-load Splash: runs before the Entry Gate, so it is necessarily
- *  SILENT — the autoplay policy keeps the AudioContext suspended until the
- *  player's first gesture, and there is no gesture yet. */
+/** The page-load Splash: held behind a Start prompt until the player's first
+ *  gesture, so it can always play WITH sound — the autoplay policy forbids
+ *  audio before that gesture on every browser, on every visit, with no
+ *  exception, so the Splash simply waits for it instead of racing it. */
 const SPLASH_MS = 1600; // total, including the pick's fade-out
 const SPLASH_PICK_AT = 380; // ms before the pick starts moving
 const SPLASH_PICK_MS = 620; // ms for the pick to cross the full width
@@ -58,6 +59,8 @@ const crossingOpts: CrossingOptions = {
 const stage = document.querySelector<HTMLCanvasElement>("[data-testid='play-area']")!;
 const stageCtx = stage.getContext("2d")!;
 const gate = document.querySelector<HTMLElement>("[data-testid='entry-gate']")!;
+const startPrompt = document.querySelector<HTMLElement>("[data-testid='tap-to-start']")!;
+const startButton = document.querySelector<HTMLButtonElement>("[data-testid='start-button']")!;
 const useCameraBtn = document.querySelector<HTMLButtonElement>("[data-testid='use-camera']")!;
 const usePointerBtn = document.querySelector<HTMLButtonElement>("[data-testid='use-pointer']")!;
 const controls = document.querySelector<HTMLElement>("#controls")!;
@@ -73,9 +76,9 @@ const audio = createAudioEngine();
 const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 type InputMode = "camera" | "pointer";
-type Phase = "splash" | "gate" | "playing";
+type Phase = "start" | "splash" | "gate" | "playing";
 
-let phase: Phase = "splash";
+let phase: Phase = "start";
 let currentMode: InputMode | null = null;
 let handTracker: HandTracker | null = null;
 let cameraTracker: CameraTracker | null = null;
@@ -238,24 +241,15 @@ function startInput(mode: InputMode): void {
  * The page-load Splash: the Strings rise in and a pick sweeps across them,
  * plucking each as it passes. Then the Entry Gate appears.
  *
- * Whether the pick is *audible* is not ours to decide. The autoplay policy
- * keeps the AudioContext suspended until the player's first gesture, so on a
- * first visit the Splash is silent however much we would like it not to be. We
- * ask anyway — browsers often grant it on a return visit — and we arm the first
- * gesture of any kind to start the strum the instant permission arrives. The
- * sound is never simply dropped; it is deferred to the earliest legal moment.
+ * Only ever called from `beginExperience`, i.e. from inside a real gesture —
+ * so `audio.resume()` here is resolving a promise already made legal, not
+ * hoping one becomes legal later, and the Splash can always play with sound.
  */
 function runSplash(): void {
   phase = "splash";
   gate.hidden = true;
   splashStartedAt = performance.now();
-
-  // Ask, and let the render loop notice if permission ever arrives. Deliberately
-  // no `await` and no `.then`: Chrome's resume() called outside a user gesture
-  // returns a promise that stays PENDING FOREVER, so anything chained to it
-  // never runs — and an `await` on it deadlocks whatever called us.
   void audio.resume();
-  armFirstGestureSound();
 
   const total = reduceMotion ? 500 : SPLASH_MS;
   window.setTimeout(() => {
@@ -264,6 +258,23 @@ function runSplash(): void {
     gate.hidden = false;
   }, total);
 }
+
+/**
+ * One-shot: the first gesture of any kind — anywhere on the page, not just the
+ * Start button — begins the experience. Called from inside that gesture, so
+ * `audio.resume()` is guaranteed legal, and the Splash that follows is never
+ * silent.
+ */
+function beginExperience(): void {
+  if (phase !== "start") return; // a digit key already skipped straight to playing
+  startPrompt.hidden = true;
+  void audio.resume();
+  runSplash();
+}
+
+window.addEventListener("pointerdown", beginExperience, { once: true });
+window.addEventListener("keydown", beginExperience, { once: true });
+startButton.addEventListener("click", beginExperience);
 
 /** The strum: every String in turn at guitar speed, ringing together. */
 function runFlourish(): void {
@@ -285,17 +296,6 @@ function strumWithPick(): void {
     const at = SPLASH_PICK_AT + lineX(i, STRING_COUNT) * SPLASH_PICK_MS - elapsed;
     window.setTimeout(() => firePluck(i, STRUM_VELOCITY), Math.max(0, at));
   });
-}
-
-/** One-shot: the first gesture of any kind unlocks audio mid-Splash. */
-function armFirstGestureSound(): void {
-  const onGesture = (): void => {
-    window.removeEventListener("pointerdown", onGesture);
-    window.removeEventListener("keydown", onGesture);
-    void audio.resume(); // the render loop picks it up once it is actually running
-  };
-  window.addEventListener("pointerdown", onGesture);
-  window.addEventListener("keydown", onGesture);
 }
 
 function enter(mode: InputMode): void {
@@ -563,10 +563,15 @@ function render(): void {
   stageCtx.clearRect(0, 0, stageWidth, stageHeight);
   const now = performance.now();
 
-  if (phase === "splash" && splashStartedAt !== null) {
-    // Polled, not promised: the moment audio is actually running the Splash
-    // starts sounding, whether that is immediately (return visit) or the
-    // instant the player touches anything.
+  if (phase === "start") {
+    // Waiting on the Start prompt: same not-yet-introduced look the Splash
+    // itself opens on, so beginning the Splash a moment later is seamless.
+    drawStrings(now, splashFade(0));
+  } else if (phase === "splash" && splashStartedAt !== null) {
+    // Polled, not promised: the moment audio is actually running, the Splash
+    // starts sounding. `runSplash` only ever runs from inside a real gesture
+    // (see `beginExperience`), so this is a matter of *when* resume()
+    // resolves, not *whether* it ever will.
     if (!splashStrummed && audio.running()) strumWithPick();
     const elapsed = now - splashStartedAt;
     // The pick has no audio to trigger yet, so it lights each String itself as
@@ -596,4 +601,3 @@ function render(): void {
 
 resizeStage();
 requestAnimationFrame(render);
-runSplash();
